@@ -3,6 +3,11 @@
 # B02-002           #
 #-------------------#
 
+# v.0.0.2
+#
+# - Made zlib parser
+#
+
 class PNG():
 
     # @
@@ -22,15 +27,7 @@ class PNG():
             self.png.update([chunk])
             sb += 12 + length
 
-    def _getCompressionMethod(self):
-        zlib = self.png['IDAT'][:1]
-        s_b = str(bin(self._trans_to_int(zlib)))
-        s_b = (8 - len(s_b.split('b')[1])) * '0' + s_b.split('b')[1]
-        cinfo = int('0b' + s_b[4:8], 0)
-        w = 2**(cinfo + 8)
-        return s_b[:4], s_b[4:8], cinfo, w/1024
-
-    #
+    # @
     # Returns size of picture
     #
     # output:  (int, int) | cortage with size
@@ -38,8 +35,26 @@ class PNG():
     def get_size(self):
         height = self._trans_to_int(self.png['IHDR'][:4])
         width  = self._trans_to_int(self.png['IHDR'][4:8])
-        return (height, width)
+        return height, width
 
+    def _get_comp_data(self):
+        return self.png['IDAT'][2:]
+
+    # @
+    # Returns dict() with CINFO, CM, FLEVEL, FDICT, FCHECK
+    #
+    # output: {name: value}
+    # @
+    def _get_zlib(self):
+        data = self.png['IDAT'][:2]
+        data = ''.join([bin(int(d, 16))[2:].zfill(8) for d in data])
+        zlib = dict()
+        zlib['CINFO'] = data[:4]
+        zlib['CM'] = data[4:8]
+        zlib['FLEVEL'] = data[8:10]
+        zlib['FDICT'] = data[10:11]
+        zlib['FCHECK'] = data[11:16]
+        return zlib
 
     # @
     # Transforms hex to int
@@ -50,7 +65,7 @@ class PNG():
     def _trans_to_int(self, bytes_array):
         return int('0x' + ''.join(bytes_array), 0)
 
-    #@
+    # @
     # Transforms hex to string
     #
     # input:   [hex]       | list of hexes
@@ -67,12 +82,10 @@ class PNG():
     # output:  (str, list) | cortage with chunk's data
     # @
     def _get_chunk(self, start_byte):
-        length = self._get_length_of_chunk(start_byte)
         name = self._get_name_of_chunk(start_byte)
         content = self._get_content_of_chunk(start_byte)
         chunk = (name, content)
         return chunk
-
 
     # @
     # Returns a list of str's view of hex byte
@@ -89,12 +102,12 @@ class PNG():
             hex_data += [str(i.hex()[j * 2] + i.hex()[j * 2 + 1]) for j in range(int(len(i.hex()) / 2))]
         return hex_data
 
-    #@
+    # @
     # Returns a length of chunk's content. It takes first 4th bytes of chunk and make an int
     #
     # input:  int | index of chunk's start byte
     # output: int | length of content
-    #@
+    # @
     def _get_length_of_chunk(self, start_byte):
         return self._trans_to_int(self.data[start_byte : start_byte + 4])
 
@@ -117,19 +130,20 @@ class PNG():
         l = self._get_length_of_chunk(start_byte)
         return self.data[start_byte + 8: start_byte + 8 + l]
 
-    #@
+    # @
     # Returns a header (first 8 bytes)
     #
     # output: list | hex list
-    #@
+    # @
     def _get_header(self):
         return self.data[:8]
 
 
-png = PNG('pic.png')
+png = PNG('test.png')
 for name in png.png:
     print(name, png.png[name])
 
 
 print(png.get_size())
-print(png._getCompressionMethod())
+print(png._get_zlib())
+print(png._get_comp_data())
